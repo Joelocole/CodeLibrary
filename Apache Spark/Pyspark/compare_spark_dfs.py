@@ -166,6 +166,8 @@ def assert_dataframes_approx_equal(
             str_fill_value = "@@_test_@@_fill_@@"
             df1 = df1.fillna({c: str_fill_value})
             df2 = df2.fillna({c: str_fill_value})
+            print(f"df1 after na fill count: \n{df1.count()}")
+            print(f"df2 after na fill count: \n{df2.count()}")
 
         if sample_fraction and sample_by_col:
             sample_column = sample_by_col.upper()
@@ -213,9 +215,6 @@ def assert_dataframes_approx_equal(
             else:
                 raise ValueError(
                     f"dataframe sizes are not identical cannot perform sample\nDataframes shapes df2: {df2.count()}\ndf1: {df1.count()}")
-
-        print(f"df1 after na fill count: \n{df1.count()}")
-        print(f"df2 after na fill count: \n{df2.count()}")
 
         non_regression_result = df1.join(df2, on=index_columns_stand, how="outer")
 
