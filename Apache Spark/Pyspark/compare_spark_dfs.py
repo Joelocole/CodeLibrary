@@ -46,7 +46,7 @@ def init_spark():
 
 def assert_dataframes_approx_equal(
         df1_path: str, df2_path: str, sep: str = ";", header: bool = None, infer_schema: bool = None,
-        spark=init_spark(),
+        spark=init_spark(), sample_fraction: float = 0.10, sample_by_col: str = None,
         suffixes: list[str] = ("_OLD", "_NEW"),
         index_columns: list[str] = None, detailed_regression: bool = False,
         start_date: str = None, end_date: str = None, ref_date_column: str = None, date_columns: list[str] = None,
@@ -136,6 +136,7 @@ def assert_dataframes_approx_equal(
             df1.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
             spark_table_null_count = \
             df2.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
+
             null_counts_dict[f"{c_name}{suffixes[0]}"] = sql_table_null_count
             null_counts_dict[f"{c_name}{suffixes[1]}"] = spark_table_null_count
 
@@ -155,16 +156,66 @@ def assert_dataframes_approx_equal(
 
         # standardizing Null values in index columns
         for c in index_columns_stand:
-            if df1.schema[c].dataType == DateType():
-                print(f"variable c: {c}")
-                date_fill_value = "2199-01-01"
-                print(f"date_fill_value c: {date_fill_value}")
-                df1 = df1.fillna({c: date_fill_value})
-                df2 = df2.fillna({c: date_fill_value})
+            # if df1.schema[c].dataType == DateType():
+            #     print(f"variable c: {c}")
+            #     date_fill_value = "2199-01-01"
+            #     print(f"date_fill_value c: {date_fill_value}")
+            #     df1 = df1.fillna({c: date_fill_value})
+            #     df2 = df2.fillna({c: date_fill_value})
+            # else:
+            str_fill_value = "@@_test_@@_fill_@@"
+            df1 = df1.fillna({c: str_fill_value})
+            df2 = df2.fillna({c: str_fill_value})
+
+        if sample_fraction and sample_by_col:
+            sample_column = sample_by_col.upper()
+            if df1.count() == df2.count():
+
+                print(f"sql table count Before sample: {df1.count()}")
+                print(f"spark table count Before sample: {df2.count()}")
+
+                seed_value = 42  # Seed for reproducibility
+
+                # Define the fractions for each category in the stratification column
+                # These should be adjusted based on your specific categories and desired sample sizes
+
+                df1_distinct_values = [
+                    row[sample_column] for row in df1.select(sample_column).distinct().collect()
+                ]
+
+                df2_distinct_values = [
+                    row[sample_column] for row in df2.select(sample_column).distinct().collect()
+                ]
+
+                # Check if null values exist in the sample_column of each DataFrame
+                df1_null_exists = df1.filter(f.col(sample_column).isNull()).count() > 0
+                df2_null_exists = df2.filter(f.col(sample_column).isNull()).count() > 0
+
+                # Include null in distinct values if it exists in each DataFrame
+                if df1_null_exists:
+                    df1_distinct_values.append(None)
+                if df2_null_exists:
+                    df2_distinct_values.append(None)
+
+                df1_fractions = {
+                    val: sample_fraction for val in df1_distinct_values
+                }
+
+                df2_fractions = {
+                    val: sample_fraction for val in df2_distinct_values
+                }
+
+                df1 = df1.stat.sampleBy(sample_column, df1_fractions, seed_value)
+                df2 = df2.stat.sampleBy(sample_column, df2_fractions, seed_value)
+
+                print(f"sql table count After sample: {df1.count()}")
+                print(f"spark table count After sample: {df2.count()}")
             else:
-                str_fill_value = "@@_test_@@_fill_@@"
-                df1 = df1.fillna({c: str_fill_value})
-                df2 = df2.fillna({c: str_fill_value})
+                raise ValueError(
+                    f"dataframe sizes are not identical cannot perform sample\nDataframes shapes df2: {df2.count()}\ndf1: {df1.count()}")
+
+        print(f"df1 after na fill count: \n{df1.count()}")
+        print(f"df2 after na fill count: \n{df2.count()}")
 
         non_regression_result = df1.join(df2, on=index_columns_stand, how="outer")
 
