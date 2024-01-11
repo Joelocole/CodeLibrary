@@ -47,7 +47,7 @@ def init_spark():
 def assert_dataframes_approx_equal(
         df1_path: str, df2_path: str, sep: str = ";", header: bool = None, infer_schema: bool = None,
         spark=init_spark(), sample_fraction: float = 0.10, sample_by_col: str = None,
-        suffixes: list[str] = ("_OLD", "_NEW"),
+        suffixes: list[str] = ("_OLD", "_NEW"), keep_equal: bool = False,
         index_columns: list[str] = None, detailed_regression: bool = False,
         start_date: str = None, end_date: str = None, ref_date_column: str = None, date_columns: list[str] = None,
         output_csv_path: str = None, abs_tolerance: float = 1.0e-4):
@@ -76,8 +76,6 @@ def assert_dataframes_approx_equal(
 
     for col_name in df2.columns:
         df2 = df2.withColumnRenamed(col_name, col_name.upper())
-
-    df1 = df1.withColumnRenamed("STRBANK_TR", "STRBANKCODE_TR")
 
     if date_columns:
         date_columns = [date_col.upper() for date_col in date_columns]
@@ -130,8 +128,6 @@ def assert_dataframes_approx_equal(
                 f.col(c_name).cast(StringType())
             )
 
-            # print(f"showing sql_table {c_name}: {sql_table[[c_name]].distinct().show()}")
-            # print(f"showing spark_table {c_name}: {spark_table[[c_name]].distinct().show()}")
             sql_table_null_count = \
             df1.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
             spark_table_null_count = \
@@ -156,13 +152,6 @@ def assert_dataframes_approx_equal(
 
         # standardizing Null values in index columns
         for c in index_columns_stand:
-            # if df1.schema[c].dataType == DateType():
-            #     print(f"variable c: {c}")
-            #     date_fill_value = "2199-01-01"
-            #     print(f"date_fill_value c: {date_fill_value}")
-            #     df1 = df1.fillna({c: date_fill_value})
-            #     df2 = df2.fillna({c: date_fill_value})
-            # else:
             str_fill_value = "@@_test_@@_fill_@@"
             df1 = df1.fillna({c: str_fill_value})
             df2 = df2.fillna({c: str_fill_value})
@@ -269,9 +258,10 @@ def assert_dataframes_approx_equal(
         )
         # non_regression_result.show()
         # Filter out rows where a True value is present in columns ending with "_COMPARE"
-        filter_condition = f.expr(
-            " OR ".join(f"{col} = False" for col in non_regression_result.columns if col.endswith('_COMPARE')))
-        non_regression_result = non_regression_result.filter(filter_condition)
+        if not keep_equal:
+            filter_condition = f.expr(
+                " OR ".join(f"{col} = False" for col in non_regression_result.columns if col.endswith('_COMPARE')))
+            non_regression_result = non_regression_result.filter(filter_condition)
 
         if not non_regression_result.isEmpty():
             print(f"Dataframes are not identical please check the file {output_csv_path} for a detailed inspection.")
