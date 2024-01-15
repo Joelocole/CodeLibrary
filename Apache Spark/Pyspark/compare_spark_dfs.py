@@ -51,7 +51,6 @@ def assert_dataframes_approx_equal(
         index_columns: list[str] = None, detailed_regression: bool = False,
         start_date: str = None, end_date: str = None, ref_date_column: str = None, date_columns: list[str] = None,
         output_csv_path: str = None, abs_tolerance: float = 1.0e-4):
-
     current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
     def remove_suffixes(input_string, _suffixes):
@@ -63,8 +62,10 @@ def assert_dataframes_approx_equal(
 
         return result
 
-    df1 = spark.read.csv(df1_path, sep=sep, header=header, inferSchema=infer_schema, nanValue="")
-    df2 = spark.read.parquet(df2_path, inferSchema=infer_schema, nanValue="")
+    df1 = spark.read.csv(df1_path, sep=sep, header=header, inferSchema=infer_schema, nanValue="") \
+        if df1_path.endswith('.csv') else spark.read.parquet(df1_path, inferSchema=infer_schema, nanValue="")
+    df2 = spark.read.csv(df1_path, sep=sep, header=header, inferSchema=infer_schema, nanValue="") \
+        if df1_path.endswith('.csv') else spark.read.parquet(df1_path, inferSchema=infer_schema, nanValue="")
 
     # STANDARDISE COLUMNS and DATA
     ref_date_column_stand = ref_date_column.upper() if ref_date_column else index_columns[0]
@@ -106,14 +107,14 @@ def assert_dataframes_approx_equal(
         digit_columns = [col.upper() for col in df1.columns if col not in index_columns_stand]
 
         for c_name in digit_columns:
-                df1 = df1.withColumn(
-                    c_name + suffixes[0],
-                    f.col(c_name).cast(DoubleType())
-                    .alias(c_name)).drop(c_name)
-                df2 = df2.withColumn(
-                    c_name + suffixes[1],
-                    f.col(c_name).cast(DoubleType())
-                    .alias(c_name)).drop(c_name)
+            df1 = df1.withColumn(
+                c_name + suffixes[0],
+                f.col(c_name).cast(DoubleType())
+                .alias(c_name)).drop(c_name)
+            df2 = df2.withColumn(
+                c_name + suffixes[1],
+                f.col(c_name).cast(DoubleType())
+                .alias(c_name)).drop(c_name)
 
         # Dates, categorical and flag data to string data type
         null_counts_dict = {}
@@ -129,9 +130,9 @@ def assert_dataframes_approx_equal(
             )
 
             sql_table_null_count = \
-            df1.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
+                df1.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
             spark_table_null_count = \
-            df2.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
+                df2.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
 
             null_counts_dict[f"{c_name}{suffixes[0]}"] = sql_table_null_count
             null_counts_dict[f"{c_name}{suffixes[1]}"] = spark_table_null_count
@@ -269,8 +270,8 @@ def assert_dataframes_approx_equal(
 
             non_regression_result.write \
                 .format("csv").option("header", "true").save(
-                f"C:/Users/osahenrunmwencole/Desktop/Prometeia/Projects/BPER_Prepayment_to_sparkSQL/local_tests/{output_csv_path[:-4]}_{current_datetime}.csv"
-            )
+                    f"C:/Users/osahenrunmwencole/Desktop/Prometeia/Projects/BPER_Prepayment_to_sparkSQL/local_tests/{output_csv_path[:-4]}_{current_datetime}.csv"
+                )
 
         # Cleaning columns Suffixes before schema assertion
         df1 = df1.toDF(*[remove_suffixes(col, suffixes) for col in df1.columns])
@@ -298,7 +299,6 @@ def assert_dataframes_approx_equal(
 
 
 if __name__ == "__main__":
-
     BASE_PATH = "C:/Users/osahenrunmwencole/"
 
     # application_decay_grouped PARAMETERS
@@ -326,7 +326,7 @@ if __name__ == "__main__":
         PATH_application_decay_grouped_OLD, PATH_application_decay_grouped_NEW,
         header=True, infer_schema=False, sep=";",
         # abs_tolerance=0.0001,
-        index_columns=index_cols, #date_columns=date_cols,
+        index_columns=index_cols,  # date_columns=date_cols,
         suffixes=("_SQL", "_SPARK"),
         output_csv_path="conflicting_df_application_grouped.csv")
-        # ref_date_column=ref_date_col, start_date="1990-01-31", end_date="2022-09-30")
+    # ref_date_column=ref_date_col, start_date="1990-01-31", end_date="2022-09-30")
