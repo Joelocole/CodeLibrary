@@ -5,6 +5,7 @@ from pyspark.sql import functions as f
 from pyspark.sql.types import DoubleType, DateType, StringType
 import re
 from datetime import datetime
+import time
 
 
 def init_spark():
@@ -14,9 +15,9 @@ def init_spark():
     os.environ['SPARK_EXECUTOR_CORES'] = "6"
     os.environ['PYSPARK_PYTHON'] = sys.executable
     os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
-    os.environ['HADOOP_HOME'] = "C:/spark/hadoop33"
-    os.environ['SPARK_HOME'] = "C:/spark/spark34"
-    sys.path.append("C:/spark/hadoop33/bin")
+    os.environ['HADOOP_HOME'] = "C:/spark/hadoop335"
+    os.environ['SPARK_HOME'] = "C:/spark/spark342"
+    sys.path.append("C:/spark/hadoop335/bin")
 
     # Creating Spark Session
     spark_session = SparkSession.builder.getOrCreate()
@@ -51,7 +52,9 @@ def assert_dataframes_approx_equal(
         index_columns: list[str] = None, detailed_regression: bool = False,
         start_date: str = None, end_date: str = None, ref_date_column: str = None, date_columns: list[str] = None,
         output_csv_path: str = None, abs_tolerance: float = 1.0e-4):
+
     current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    start_time = time.time()
 
     def remove_suffixes(input_string, _suffixes):
         # Create a regex pattern to match any of the specified suffixes at the end of the string
@@ -64,6 +67,7 @@ def assert_dataframes_approx_equal(
 
     df1 = spark.read.csv(df1_path, sep=sep, header=header, inferSchema=infer_schema, nanValue="") \
         if df1_path.endswith('.csv') else spark.read.parquet(df1_path, inferSchema=infer_schema, nanValue="")
+
     df2 = spark.read.csv(df1_path, sep=sep, header=header, inferSchema=infer_schema, nanValue="") \
         if df1_path.endswith('.csv') else spark.read.parquet(df1_path, inferSchema=infer_schema, nanValue="")
 
@@ -101,7 +105,7 @@ def assert_dataframes_approx_equal(
             .filter((f.col(ref_date_column_stand) >= _start_date) & (f.col(ref_date_column_stand) <= _end_date))
 
     # COMPARE DFS
-    if ~(df1.count() == df2.count()) & ~(len(df1.columns) == len(df2.columns) & ~(df1.columns == df2.columns)):
+    if (df1.count() == df2.count()) & (len(df1.columns) == len(df2.columns)):
 
         # Select numeric columns to check
         digit_columns = [col.upper() for col in df1.columns if col not in index_columns_stand]
@@ -156,8 +160,8 @@ def assert_dataframes_approx_equal(
             str_fill_value = "@@_test_@@_fill_@@"
             df1 = df1.fillna({c: str_fill_value})
             df2 = df2.fillna({c: str_fill_value})
-            print(f"df1 after na fill count: \n{df1.count()}")
-            print(f"df2 after na fill count: \n{df2.count()}")
+        print(f"df1 after na fill count: \n{df1.count()}")
+        print(f"df2 after na fill count: \n{df2.count()}")
 
         if sample_fraction and sample_by_col:
             sample_column = sample_by_col.upper()
@@ -288,7 +292,8 @@ def assert_dataframes_approx_equal(
         if non_regression_result.count() > 0:
             non_regression_result.show()
 
-        print("========= ✔️ Test Passed. Dataframes are identical. =========")
+        print(f"========= ✔️ Test Passed. --- %s seconds ---" % (time.time() - start_time), "Dataframes are identical. =========")
+
 
     else:
         raise ValueError(
@@ -299,7 +304,7 @@ def assert_dataframes_approx_equal(
 
 
 if __name__ == "__main__":
-    BASE_PATH = "C:/Users/osahenrunmwencole/"
+    BASE_PATH = "C:/Users/osahenrunmwencole/Dekstop/"
 
     # application_decay_grouped PARAMETERS
     PATH_tassi_varmacro_OLD = BASE_PATH + "Downloads//tassi_varmacro_mp.csv"
@@ -311,22 +316,53 @@ if __name__ == "__main__":
     # ref_date_col = "data_oss"
     # date_cols = ["data_oss"]
 
-    # application_decay_grouped PARAMETERS
-    PATH_application_decay_grouped_OLD = BASE_PATH + "Downloads/DB_POSTGRE/l1_varmacro_application_202312250033.csv"  # DB POSTGRE
-    PATH_application_decay_grouped_NEW = BASE_PATH + "Downloads/BLOB/L1_varmacro_application.parquet"  # BLOB
+    # L2_PREPAYMENT PARAMETERS
+    PATH_L2_PREPAYMENT_IN = "C:/Users/osahenrunmwencole/Desktop/L2_PREPAYMENT_IN.csv"  # IN
+    PATH_L2_PREPAYMENT_OUT = "C:/Users/osahenrunmwencole/Desktop/L2_PREPAYMENT_OUT.csv"  # OUT
 
     index_cols = [
-        "data_oss",
+        "bank_code",
+        "strcodope",
+        "strbnk",
+        "strflagipo",
+        "iratestucturetype",
+        "icurrentratetype",
+        "dterog",  # date col
+        "dterog_eom",  # date col
+        "dtscad",  # date col
+        "dtscad_eom",  # date col
+        "dtrif",  # date col
+        "dtrif_1",  # date col
+        "dtrif_eom",  # date col
+        "iirotype",
+        "iamortizationtype",
+        "ifrequency",
+        "dtfinphaseenddate",  # date col
+        "strctpgeog",
+        "strflagprep",
+        "strsegrisk",
+        "strregione",
+        "isae",
+        "strsae",
+        "istatus",
+        "ievent"
     ]
 
-    # ref_date_col = "dtCutOff"
-    date_cols = ["data_oss"]
+    date_cols = [
+        "dterog",  # date col
+        "dterog_eom",  # date col
+        "dtscad",  # date col
+        "dtscad_eom",  # date col
+        "dtrif",  # date col
+        "dtrif_1",  # date col
+        "dtrif_eom",  # date col
+        "dtfinphaseenddate",  # date col
+    ]
 
     assert_dataframes_approx_equal(
-        PATH_application_decay_grouped_OLD, PATH_application_decay_grouped_NEW,
+        PATH_L2_PREPAYMENT_IN, PATH_L2_PREPAYMENT_OUT,
         header=True, infer_schema=False, sep=";",
         # abs_tolerance=0.0001,
-        index_columns=index_cols,  # date_columns=date_cols,
-        suffixes=("_SQL", "_SPARK"),
-        output_csv_path="conflicting_df_application_grouped.csv")
-    # ref_date_column=ref_date_col, start_date="1990-01-31", end_date="2022-09-30")
+        index_columns=index_cols, date_columns=date_cols,
+        suffixes=("_IN", "_OUT"),
+        output_csv_path="conflicting_df_L2_PREPAYMENT_TEST_OUTPUT.csv")
