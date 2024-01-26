@@ -47,7 +47,7 @@ def init_spark():
 
 def assert_dataframes_approx_equal(
         df1_path: str, df2_path: str, sep: str = ";", header: bool = None, infer_schema: bool = None,
-        spark=init_spark(), sample_fraction: float = 0.10, sample_by_col: str = None,
+        spark=init_spark(), sample_fraction: float = 0.10, sample_by_col: str = None, count_nulls: bool = False,
         suffixes: list[str] = ("_OLD", "_NEW"), keep_equal: bool = False,
         index_columns: list[str] = None, detailed_regression: bool = False,
         start_date: str = None, end_date: str = None, ref_date_column: str = None, date_columns: list[str] = None,
@@ -77,7 +77,7 @@ def assert_dataframes_approx_equal(
 
     # Convert column names to uppercase
     for col_name in df1.columns:
-        df1 = df1.withColumnRenamed(col_name, col_name.upper())
+        df1 = df1.withColumnRenamed(col_name, col_name.upper()) 
 
     for col_name in df2.columns:
         df2 = df2.withColumnRenamed(col_name, col_name.upper())
@@ -133,16 +133,18 @@ def assert_dataframes_approx_equal(
                 f.col(c_name).cast(StringType())
             )
 
-            sql_table_null_count = \
-                df1.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
-            spark_table_null_count = \
-                df2.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
+        if count_nulls:
+            for c_name in index_columns_stand:
+                sql_table_null_count = \
+                    df1.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
+                spark_table_null_count = \
+                    df2.select(f.sum(f.col(c_name).isNull().cast("int")).alias("NullCount")).collect()[0]["NullCount"]
 
-            null_counts_dict[f"{c_name}{suffixes[0]}"] = sql_table_null_count
-            null_counts_dict[f"{c_name}{suffixes[1]}"] = spark_table_null_count
+                null_counts_dict[f"{c_name}{suffixes[0]}"] = sql_table_null_count
+                null_counts_dict[f"{c_name}{suffixes[1]}"] = spark_table_null_count
 
-        for column, count in null_counts_dict.items():
-            print(f"Number of nulls in the '{column}' column: {count}")
+            for column, count in null_counts_dict.items():
+                print(f"Number of nulls in the '{column}' column: {count}")
 
         print(f"df1 count: \n{df1.count()}")
         print(f"df2 count: \n{df2.count()}")
@@ -160,8 +162,6 @@ def assert_dataframes_approx_equal(
             str_fill_value = "@@_test_@@_fill_@@"
             df1 = df1.fillna({c: str_fill_value})
             df2 = df2.fillna({c: str_fill_value})
-        print(f"df1 after na fill count: \n{df1.count()}")
-        print(f"df2 after na fill count: \n{df2.count()}")
 
         if sample_fraction and sample_by_col:
             sample_column = sample_by_col.upper()
@@ -292,7 +292,7 @@ def assert_dataframes_approx_equal(
         if non_regression_result.count() > 0:
             non_regression_result.show()
 
-        print(f"========= ✔️ Test Passed. --- %s seconds ---" % (time.time() - start_time), "Dataframes are identical. =========")
+        print(f"========= ✔️ Test Passed. --- in %s seconds ---" % round((time.time() - start_time), 2), "Dataframes are identical. =========")
 
 
     else:
@@ -304,65 +304,25 @@ def assert_dataframes_approx_equal(
 
 
 if __name__ == "__main__":
-    BASE_PATH = "C:/Users/osahenrunmwencole/Dekstop/"
-
-    # application_decay_grouped PARAMETERS
-    PATH_tassi_varmacro_OLD = BASE_PATH + "Downloads//tassi_varmacro_mp.csv"
-    PATH_tassi_varmacro_NEW = BASE_PATH + "Desktop/Prometeia/Projects/BPER_Prepayment_to_sparkSQL/local_tests/tassi_varmacro_local.csv"
-
-    # index_cols = [
-    #     "data_oss"
-    # ]
-    # ref_date_col = "data_oss"
-    # date_cols = ["data_oss"]
-
-    # L2_PREPAYMENT PARAMETERS
-    PATH_L2_PREPAYMENT_IN = "C:/Users/osahenrunmwencole/Desktop/L2_PREPAYMENT_IN.csv"  # IN
-    PATH_L2_PREPAYMENT_OUT = "C:/Users/osahenrunmwencole/Desktop/L2_PREPAYMENT_OUT.csv"  # OUT
 
     index_cols = [
-        "bank_code",
-        "strcodope",
-        "strbnk",
-        "strflagipo",
-        "iratestucturetype",
-        "icurrentratetype",
-        "dterog",  # date col
-        "dterog_eom",  # date col
-        "dtscad",  # date col
-        "dtscad_eom",  # date col
-        "dtrif",  # date col
-        "dtrif_1",  # date col
-        "dtrif_eom",  # date col
-        "iirotype",
-        "iamortizationtype",
-        "ifrequency",
-        "dtfinphaseenddate",  # date col
-        "strctpgeog",
-        "strflagprep",
-        "strsegrisk",
-        "strregione",
-        "isae",
-        "strsae",
-        "istatus",
-        "ievent"
+        "dtCutOff", "iSeasoning", "iFlagLastObs", "strPosition", "strServizio", "strBankCode_descr", "strBank_tr", "strCtpSAE_updateG",
+        "strCtpSAE_TR_updateG", "strModel", "strFlagParNPar", "strPerNPer", "iClassVol", "strTransAccDA"
     ]
+    # ref_date_col = "data_oss"
+    date_cols = ["dtcutoff"]
 
-    date_cols = [
-        "dterog",  # date col
-        "dterog_eom",  # date col
-        "dtscad",  # date col
-        "dtscad_eom",  # date col
-        "dtrif",  # date col
-        "dtrif_1",  # date col
-        "dtrif_eom",  # date col
-        "dtfinphaseenddate",  # date col
-    ]
+    # MP_GROUPED_DECAY PARAMETERS
+    PATH_OLD = "C:/Users/osahenrunmwencole/Downloads/DB_POSTGRE"
+    PATH_NEW = "C:/Users/osahenrunmwencole/Downloads/BLOB"
+
+    DB_POSTGRE = PATH_OLD + "/mp_grouped_decay.csv"
+    BLOB_SPARK = PATH_NEW + "/mp_grouped_decay.csv/part-00000-01e506a7-3e07-49a9-b718-0322ef954771-c000.csv"
 
     assert_dataframes_approx_equal(
-        PATH_L2_PREPAYMENT_IN, PATH_L2_PREPAYMENT_OUT,
+        DB_POSTGRE, BLOB_SPARK,
         header=True, infer_schema=False, sep=";",
         # abs_tolerance=0.0001,
         index_columns=index_cols, date_columns=date_cols,
-        suffixes=("_IN", "_OUT"),
-        output_csv_path="conflicting_df_L2_PREPAYMENT_TEST_OUTPUT.csv")
+        suffixes=("_SQL", "_SPARK"),
+        output_csv_path="conflicting_df_MP_GROUPED_DECAY.csv")
