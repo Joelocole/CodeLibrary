@@ -291,8 +291,11 @@ def assert_dataframes_approx_equal(
 
         if non_regression_result.count() > 0:
             non_regression_result.show()
+        GREEN = '\033[92m'
+        RESET = '\033[0m'
+        print(GREEN + f"--- ✔️ Test Passed (in %s seconds). ---" % round((time.time() - start_time), 2), "Dataframes are identical." + RESET)
 
-        print(f"========= ✔️ Test Passed. --- in %s seconds ---" % round((time.time() - start_time), 2), "Dataframes are identical. =========")
+
 
 
     else:
