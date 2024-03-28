@@ -1,58 +1,12 @@
-import os
-import sys
-import random
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as f
 from pyspark.sql.types import DoubleType, DateType, StringType
 import re
-from datetime import datetime
-
-
-def init_spark():
-    # SPARK INITIALISATION
-    # Defining Environment Variables
-    os.environ['SPARK_DRIVER_MEMORY'] = "8G"
-    os.environ['SPARK_EXECUTOR_CORES'] = "6"
-    os.environ['PYSPARK_PYTHON'] = sys.executable
-    os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
-    os.environ['HADOOP_HOME'] = "C:/spark/hadoop335"
-    os.environ['SPARK_HOME'] = "C:/spark/spark342"
-    sys.path.append("C:/spark/hadoop335/bin")
-
-    # Creating Spark Session
-    spark_session = SparkSession.builder.getOrCreate()
-
-    print(f"Spark version: {spark_session.version}")
-    conf = spark_session.sparkContext._conf.setAll(
-        [
-            ('spark.app.name', 'APP Prepayment | Local - Tests'),
-            ("spark.sql.execution.arrow.pyspark.enabled", "true"),
-            ('spark.driver.maxResultSize', "8G"),
-            ("spark.memory.offHeap.enabled", "true"),
-            ('spark.memory.offHeap.size', '8G'),
-            ("spark.sql.shuffle.partitions", "10"),
-            ("spark.sql.adaptive.enabled", "true"),
-            ("spark.sql.autoBroadcastJoinThreshold", "-1"),
-            ("spark.sql.debug.maxToStringFields", "250"),
-            ("spark.executor.memory", "11g"),
-            # ("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
-        ]
-    )
-
-    spark_session.sparkContext.stop()
-    spark_session = SparkSession.builder.config(conf=conf).getOrCreate()
-    spark_session.sparkContext.setCheckpointDir("checkpoint")
-
-    return spark_session
-
-
-spark = init_spark()
 
 
 def assert_dataframes_approx_equal(
         df1, df2,
         suffixes: list[str] = ("_OLD", "_NEW"), count_nulls: bool = False, keep_equal: bool = False,
-        index_columns: list[str] = None, show_detailed_regression: bool = False,
+        index_columns: list[str] = None, show_detailed_regression: bool = False, output_path_name: str = "",
         start_date: str = None, end_date: str = None, ref_date_column: str = None, date_columns: list[str] = None,
         abs_tolerance: float = 1.0e-4):
 
@@ -211,8 +165,12 @@ def assert_dataframes_approx_equal(
             non_regression_result = non_regression_result.filter(filter_condition)
 
         if not non_regression_result.isEmpty():
+            non_regression_result.repartition(1).write \
+                .format("csv").option("header", "true").mode("overwrite").save(
+                    output_path_name
+                )
             print(
-                f"Dataframes are not identical please check the file 'Pipe_3_OUT_mp_application_decay_grouped' for a detailed inspection.")
+                f"Dataframes are not identical please check the file '{output_path_name}' for a detailed inspection.")
 
         return non_regression_result
     else:
@@ -221,61 +179,3 @@ def assert_dataframes_approx_equal(
             f"\nShapes -> Df1: {df1.count(), len(df1.columns)} Df2: {df2.count(), len(df2.columns)}"
             f"\nDf1 columns: {df1.columns} Df2 columns: {df2.columns}"
         )
-
-
-index_cols = [
-    'BANK_CONTRACT_CODE', 'KEY_EVENTO', 'OBSERVATION_DATE', 'BANK_CODE', 'REFERENCE_DATE', 'CUST_CODE', 'SERVIZIO',
-    'CONTRACT_CODE', 'CONTRACT_CODE_1', 'STATUS', 'DT_EVENTO', 'CURRENCY', 'PRODUCT_TYPE', 'FLAG_RESID',
-    'FLAG_MORTGAGE', 'FLAG_WIP', 'JOINT_ACCOUNT_FLAG', 'DISBURSEMENT_DATE',
-    # 'DURATION_PREAM',
-    # 'ORIGINAL_OUTSTANDING', 'CURRENT_OUTSTANDING', 'PRINCIPAL_INSTALMENT', 'PREPAID_AMOUNT',
-    'MATURITY_DATE',
-    'MATURITY_RENEGOTIATION_TYPE', 'RATE_RENEGOTIATION_TYPE', 'OTHER_RENEGOTIATION_TYPE', 'AMORTIZATION_TYPE',
-    'PRINCIPAL_PAYMENT_FREQUENCY', 'RATE_STRUCTURE_TYPE', 'CURRENT_RATE_TYPE',
-    'SPREAD', 'RATE_VALUE',
-    'IRO_TYPE',
-    # 'FLOOR_VALUE', 'CAP_VALUE',
-    'FIN_PHASE_END_DATE',
-    'PENALTY',
-    # 'LOAN_TO_VALUE',
-    'FLAG_CHANGE_BANK',
-    'REFERENCE_RATE', 'SECURITIZATION', 'FLAG_PERFORMING', 'SECTOR_CODE', 'CUST_ACTIV_AREA_CODE', 'CUST_TYPE',
-    'CUST_TYPE_REGULATORY', 'RATING', 'COD_SEGMENTAZIONE_RATING', 'COD_PROVINCIA_RESIDENZA',
-    'FLAG_GARANZIA_PERSONALE', 'FLAG_RAPPORTI_NON_RATEALI', 'FLAG_RAPPORTI_PATRIMONIALI',
-    # 'LOAN_TO_VALUE_ORIGINATION',
-    'DT_STIPULA',
-    # 'CALCOLATA',
-    'TR_SAE', 'TR_SAE_SEG',
-    'OBSERVATION_DATE_1',
-    # 'dtMinRefDate', 'dtMaxRefDate',
-    # 'dTimeDelay', 'dTimeAlive',
-    # 'iMonthAlive', 'iMonthObs', 'iIndFirstRif',
-    # 'iIndLastRif', 'iDurOrig', 'iDurCurrent', 'iTimeDelay',
-    # 'RATE_VALUE_OLD', 'EuriborRate', 'SPREAD_INFERRED',
-    'DISBURSEMENT_DATE_1',
-    # 'TassoParMat0', 'TassoParMatCurr', 'Eur3M0', 'Eur3MCurr', 'Spread0', 'SpreadT',
-    # 'dDSpread_IRO', 'dDSpread', 'dRis', 'dRil', 'dRil_RateValue', 'Spread_BTP_BUND', 'Disoccupazione',
-    # 'PrezziAbitazioni', 'Inflazione', 'PIL'
-]
-
-date_cols = [
-    'OBSERVATION_DATE_1',
-    'DISBURSEMENT_DATE_1',
-    'DT_STIPULA',
-    'FIN_PHASE_END_DATE',
-    'DT_EVENTO',
-    'OBSERVATION_DATE',
-]
-
-dfo = "C:/Users/osahenrunmwencole/Desktop/Prometeia/Projects/CCB Prepayment MP/ccb_preproc/data/blob_data_original/preprocessed/PREPAYMENT_CCB_CLEAN_ALL_VAR_NOVEMBER.parquet"  # FULL HISTORICAL BENCHMARK
-dfn = "C:/Users/osahenrunmwencole/Desktop/Prometeia/Projects/CCB Prepayment MP/ccb_preproc/tests/mp_data/PreprocWorkdir/PREPAYMENT_CLEAN_MACRO.parquet"  # WITH HISTORICAL DATA
-# abs_outp_path = "C:/Users/osahenrunmwencole/Desktop/Prometeia/CodeLibrary/Apache Spark/Pyspark/"
-
-df1 = spark.read.parquet(dfo)
-df2 = spark.read.parquet(dfn)
-
-Pipe_3_OUT_mp_application_decay_grouped = assert_dataframes_approx_equal(
-    df1=df1, df2=df2, date_columns=date_cols, show_detailed_regression=True,
-    # abs_tolerance=0.0001,
-    index_columns=index_cols, suffixes=("_SQL", "_SPARK")
-)
