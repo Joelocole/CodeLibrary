@@ -31,7 +31,6 @@ def get_datasource(base_url: str, pk_datasource: str, api: str = "/api/v0/") -> 
         print(response.json())
 
     response = response.json()
-    # pipeline_ds = [ds for ds in pipeline_dict if ds["classname"] == "DataSource"]
 
     return response
 
@@ -63,7 +62,7 @@ def get_connector(base_url: str, pk) -> dict:
 
 
 if __name__ == "__main__":
-
+    # read creds
     with open('./creds.json') as f:
         creds_dict = json.load(f)
 
@@ -74,8 +73,7 @@ if __name__ == "__main__":
     # Authenticating
     client = Client.from_credentials(url=base_url, user=user, password=password)
 
-    Session = client._api_client.session
-
+    # params
     projects_names = [
         "PREPROCESSING_APPLICATION_SIGHT_DEPOSIT_VOLUMES_SPARK",
         "PREPROCESSING_ESTIMATION_PREPAYMENT_SPARK",
@@ -87,15 +85,10 @@ if __name__ == "__main__":
         "BPER_PREPAYMENT_APPLICATION",
         "SIGHT_DEPOSIT_DECAY_APPLICATION",
         "SIGHT_DEPOSIT_STABLE_ESTIMATION",
-        "BPER_PREPAYMENT_ESTIMATION",
+        "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
         "SIGHT_DEPOSIT_DECAY_ESTIMATION",
         "BPER_RATES_MODEL_ESTIMATION"
     ]
-
-    # projects = [
-    #     project for p in projects_names for project in client.get_projects_by_name(p) if ("_OLD" not in project.name)
-    #     & ("[CONVALIDA]" not in project.name)
-    # ]"
 
     shorten_project_names = {
         "PREPROCESSING_APPLICATION_SIGHT_DEPOSIT_VOLUMES_SPARK": "PREPROC_APPLIC_S_D_VOLUMES",
@@ -113,6 +106,7 @@ if __name__ == "__main__":
         "BPER_RATES_MODEL_ESTIMATION": "BPER_RATES_MODEL_EST"
     }
 
+    # get projects to process
     projects = [
         project for p in projects_names for project in get_projects_by_name_fork(client=client, pattern=p)
     ]
@@ -151,6 +145,7 @@ if __name__ == "__main__":
                 "FOLDER_NAME"
             ]
         )
+
         resource_count = 0
         local_resources = 0
         for pipe_name, ds in ds_info.items():
@@ -173,21 +168,24 @@ if __name__ == "__main__":
                         filename,
                         storage_account,
                         container_name,
-                        path,
+                        path
                     )
                     resource_count += 1
 
                 else:
                     local_resources += 1
                     print("skipping local data sources...")
-                    print(f"{d['uid']}", [k for k in d["connector"].keys()])
+                    # print(f"{d['uid']}", [k for k in d["connector"].keys()])
 
             dfs[project.name] = df
 
-        print(f"REMOTE data sources in pipeline -> {resource_count}")
+            # fragmented operation (on disk).
+            # df.to_csv(f"data/{shorten_project_names[project.name]}", sep=";", index=False)
+
+        print(f"REMOTE data sources -> {resource_count}")
         print(f"skipped LOCAL data sources: {local_resources}")
-        print(f"TOTAL data sources: {local_resources}")
-        print("______________________________________")
+        print(f"TOTAL data sources: {local_resources + resource_count}")
+        print("____________________________________________________________________________")
         print("\n")
 
     with pd.ExcelWriter("bper_datasource_routing_map.xlsx") as writer:
