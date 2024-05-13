@@ -73,6 +73,8 @@ if __name__ == "__main__":
     # Authenticating
     client = Client.from_credentials(url=base_url, user=user, password=password)
 
+    output_name = "bper_new.xlsx"
+
     # params
     projects_names = [
         "PREPROCESSING_APPLICATION_SIGHT_DEPOSIT_VOLUMES_SPARK",
@@ -81,13 +83,13 @@ if __name__ == "__main__":
         "PREPROCESSING_ESTIMATION_SIGHT_DEPOSIT_VOLUME_SPARK",
         "PREPROCESSING_APPLICATION_PREPAYMENT_SPARK",
         "SCENARIO_DATA_PREPARATION",
-        "SIGHT_DEPOSIT_STABLE_APPLICATION",
-        "BPER_PREPAYMENT_APPLICATION",
-        "SIGHT_DEPOSIT_DECAY_APPLICATION",
-        "SIGHT_DEPOSIT_STABLE_ESTIMATION",
-        "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
-        "SIGHT_DEPOSIT_DECAY_ESTIMATION",
-        "BPER_RATES_MODEL_ESTIMATION"
+        # "SIGHT_DEPOSIT_STABLE_APPLICATION",
+        # "BPER_PREPAYMENT_APPLICATION",
+        # "SIGHT_DEPOSIT_DECAY_APPLICATION",
+        # "SIGHT_DEPOSIT_STABLE_ESTIMATION",
+        # "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
+        # "SIGHT_DEPOSIT_DECAY_ESTIMATION",
+        # "BPER_RATES_MODEL_ESTIMATION"
     ]
 
     shorten_project_names = {
@@ -138,6 +140,7 @@ if __name__ == "__main__":
             columns=[
                 "PIPELINE",
                 "DATASOURCE_NAME",
+                "TYPE",
                 "CONNECTOR_NAME",
                 "FILE_NAME",
                 "STORAGE_ACCOUNT_NAME",
@@ -146,8 +149,8 @@ if __name__ == "__main__":
             ]
         )
 
-        resource_count = 0
-        local_resources = 0
+        remote_ds_count = 0
+        local_ds_count = 0
         for pipe_name, ds in ds_info.items():
             for d in ds:
                 remote_connector = d["connector"].get("remote_connector")
@@ -164,17 +167,28 @@ if __name__ == "__main__":
                     df.loc[len(df)] = (
                         pipe_name,
                         d["ID"],
+                        "remote",
                         connector_name,
                         filename,
                         storage_account,
                         container_name,
                         path
                     )
-                    resource_count += 1
+                    remote_ds_count += 1
 
                 else:
-                    local_resources += 1
-                    print("skipping local data sources...")
+                    df.loc[len(df)] = (
+                        pipe_name,
+                        d["ID"],
+                        "local",
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
+                    )
+                    local_ds_count += 1
+                    # print("skipping local data sources...")
                     # print(f"{d['uid']}", [k for k in d["connector"].keys()])
 
             dfs[project.name] = df
@@ -182,12 +196,12 @@ if __name__ == "__main__":
             # fragmented operation (on disk).
             # df.to_csv(f"data/{shorten_project_names[project.name]}", sep=";", index=False)
 
-        print(f"REMOTE data sources -> {resource_count}")
-        print(f"skipped LOCAL data sources: {local_resources}")
-        print(f"TOTAL data sources: {local_resources + resource_count}")
+        print(f"REMOTE data sources -> {remote_ds_count}")
+        print(f"LOCAL data sources -> {local_ds_count}")
+        print(f"TOTAL data sources: {local_ds_count + remote_ds_count}")
         print("____________________________________________________________________________")
         print("\n")
 
-    with pd.ExcelWriter("bper_datasource_routing_map.xlsx") as writer:
+    with pd.ExcelWriter(output_name) as writer:
         for table_name, df in dfs.items():
             df.to_excel(writer, sheet_name=shorten_project_names[table_name], index=False)
