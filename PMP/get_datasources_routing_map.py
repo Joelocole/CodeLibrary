@@ -5,10 +5,18 @@ import requests
 from typing import List
 
 
-def get_datasource_inside_pipeline(
-        client: Client,
-        pipeline_pk,
-):
+def get_datasource_inside_pipeline(client: Client, pipeline_pk: str) -> List[str]:
+    """
+
+    Parameters
+    ----------
+    client
+    pipeline_pk
+
+    Returns
+    -------
+
+    """
     api_client = client._api_client
     session = api_client.session
     resource_type = "pipeline"
@@ -19,23 +27,37 @@ def get_datasource_inside_pipeline(
     return pipeline_ds
 
 
-def get_datasource(base_url: str, pk_datasource: str, api: str = "/api/v0/") -> json:
+def get_datasource(client: Client, pk_datasource: str) -> json:
+    """
+
+    Parameters
+    ----------
+    client
+    pk_datasource
+
+    Returns
+    -------
+
+    """
     api_client = client._api_client
-    session = api_client.session
-    response = session.get(base_url + api + "datasource/{}/".format(pk_datasource))
-
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as err:
-        print(f"Error in retrieving datasource metadata: {err}")
-        print(response.json())
-
-    response = response.json()
+    # session = api_client.session
+    response = api_client.get_datasource(pk_datasource)
 
     return response
 
 
-def get_projects_by_name_fork(client, pattern: str) -> List[Project]:
+def get_projects_by_name_fork(client: Client, pattern: str) -> List[Project]:
+    """
+
+    Parameters
+    ----------
+    client
+    pattern
+
+    Returns
+    -------
+
+    """
     result = []
     all_projects = client.get_projects()
     for project in all_projects:
@@ -48,7 +70,18 @@ def get_projects_by_name_fork(client, pattern: str) -> List[Project]:
     return result
 
 
-def get_connector(base_url: str, pk) -> dict:
+def get_connector(client: Client, pk) -> dict:
+    """
+
+    Parameters
+    ----------
+    client
+    pk
+
+    Returns
+    -------
+
+    """
     resource_type = "connector"
     api_client = client._api_client
     session = api_client.session
@@ -83,13 +116,13 @@ if __name__ == "__main__":
         "PREPROCESSING_ESTIMATION_SIGHT_DEPOSIT_VOLUME_SPARK",
         "PREPROCESSING_APPLICATION_PREPAYMENT_SPARK",
         "SCENARIO_DATA_PREPARATION",
-        # "SIGHT_DEPOSIT_STABLE_APPLICATION",
-        # "BPER_PREPAYMENT_APPLICATION",
-        # "SIGHT_DEPOSIT_DECAY_APPLICATION",
-        # "SIGHT_DEPOSIT_STABLE_ESTIMATION",
-        # "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
-        # "SIGHT_DEPOSIT_DECAY_ESTIMATION",
-        # "BPER_RATES_MODEL_ESTIMATION"
+        "SIGHT_DEPOSIT_STABLE_APPLICATION",
+        "BPER_PREPAYMENT_APPLICATION",
+        "SIGHT_DEPOSIT_DECAY_APPLICATION",
+        "SIGHT_DEPOSIT_STABLE_ESTIMATION",
+        "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
+        "SIGHT_DEPOSIT_DECAY_ESTIMATION",
+        "BPER_RATES_MODEL_ESTIMATION"
     ]
 
     shorten_project_names = {
@@ -130,11 +163,12 @@ if __name__ == "__main__":
             data_ = []
             for ds in pipeline_ds:
                 ds_name = ds["uid"][:-6]
+                if ds_name != "TV_IPO_df_Input":
 
-                data = get_datasource(base_url=base_url, pk_datasource=ds["pk"])
-                data_.append(data)
+                    data = get_datasource(client=client, pk_datasource=ds["pk"])
+                    data_.append(data)
 
-            ds_info[pipe_name] = data_
+                ds_info[pipe_name] = data_
 
         df = pd.DataFrame(
             columns=[
@@ -157,7 +191,7 @@ if __name__ == "__main__":
                 filename = d["connector"].get("filename")
 
                 if remote_connector:
-                    connector_info = get_connector(base_url=base_url, pk=remote_connector)
+                    connector_info = get_connector(client=client, pk=remote_connector)
 
                     storage_account = connector_info.get("storage_account")
                     container_name = connector_info.get("container_name")
@@ -205,3 +239,5 @@ if __name__ == "__main__":
     with pd.ExcelWriter(output_name) as writer:
         for table_name, df in dfs.items():
             df.to_excel(writer, sheet_name=shorten_project_names[table_name], index=False)
+            print(F"{shorten_project_names[table_name]}, Sheet added. ")
+    print("'output_name', written.")
