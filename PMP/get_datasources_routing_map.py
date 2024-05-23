@@ -1,7 +1,7 @@
 from mp_client import Client, Project
 import json
 import pandas as pd
-import requests
+import time
 from typing import List
 
 
@@ -95,6 +95,8 @@ def get_connector(client: Client, pk) -> dict:
 
 
 if __name__ == "__main__":
+    start_time = time.time()
+
     # read creds
     with open('./creds.json') as f:
         creds_dict = json.load(f)
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     # Authenticating
     client = Client.from_credentials(url=base_url, user=user, password=password)
 
-    output_name = "bper_new.xlsx"
+    output_name = "bper_datasource_routing_map.xlsx"
 
     # params
     projects_names = [
@@ -147,7 +149,10 @@ if __name__ == "__main__":
     ]
 
     dfs = {}
+    n_prj = 1
     for project in projects:
+        n_prj += 1
+        print(f"project number: {n_prj}")
         print(f"processing project: {project.name}")
         all_res = project.get_resources()
         pip_dict = {i.uid[:-6]: i.pk for i in all_res if i._cls == 'DataFlow'}
@@ -163,10 +168,9 @@ if __name__ == "__main__":
             data_ = []
             for ds in pipeline_ds:
                 ds_name = ds["uid"][:-6]
-                if ds_name != "TV_IPO_df_Input":
 
-                    data = get_datasource(client=client, pk_datasource=ds["pk"])
-                    data_.append(data)
+                data = get_datasource(client=client, pk_datasource=ds["pk"])
+                data_.append(data)
 
                 ds_info[pipe_name] = data_
 
@@ -233,11 +237,18 @@ if __name__ == "__main__":
         print(f"REMOTE data sources -> {remote_ds_count}")
         print(f"LOCAL data sources -> {local_ds_count}")
         print(f"TOTAL data sources: {local_ds_count + remote_ds_count}")
+        print("\n")
         print("____________________________________________________________________________")
         print("\n")
 
     with pd.ExcelWriter(output_name) as writer:
         for table_name, df in dfs.items():
             df.to_excel(writer, sheet_name=shorten_project_names[table_name], index=False)
-            print(F"{shorten_project_names[table_name]}, Sheet added. ")
-    print("'output_name', written.")
+            print(f"{shorten_project_names[table_name]}, Sheet added. ")
+
+    green = '\033[92m'
+    reset = '\033[0m'
+    print(
+        green + f"Success. in (%s seconds). "
+        % round((time.time() - start_time), 2), f"\nFile '{output_name}', written." + reset
+    )
