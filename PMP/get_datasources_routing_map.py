@@ -108,23 +108,36 @@ if __name__ == "__main__":
     # Authenticating
     client = Client.from_credentials(url=base_url, user=user, password=password)
 
-    output_name = "bper_datasource_routing_map.xlsx"
+    output_name = "bper_audit_datasource_routing_map.xlsx"
 
     # params
     projects_names = [
-        "PREPROCESSING_APPLICATION_SIGHT_DEPOSIT_VOLUMES_SPARK",
-        "PREPROCESSING_ESTIMATION_PREPAYMENT_SPARK",
+        # "PREPROCESSING_APPLICATION_SIGHT_DEPOSIT_VOLUMES_SPARK",
+        # "PREPROCESSING_ESTIMATION_PREPAYMENT_SPARK",
+        # "PREPROCESSING_ESTIMATION_SIGHT_DEPOSIT_RATES_SPARK",
+        # "PREPROCESSING_ESTIMATION_SIGHT_DEPOSIT_VOLUME_SPARK",
+        # "PREPROCESSING_APPLICATION_PREPAYMENT_SPARK",
+        # "SCENARIO_DATA_PREPARATION",
+        # "SIGHT_DEPOSIT_STABLE_APPLICATION",
+        # "BPER_PREPAYMENT_APPLICATION",
+        # "SIGHT_DEPOSIT_DECAY_APPLICATION",
+        # "SIGHT_DEPOSIT_STABLE_ESTIMATION",
+        # "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
+        # "SIGHT_DEPOSIT_DECAY_ESTIMATION",
+        # "BPER_RATES_MODEL_ESTIMATION"
+        "SCENARIO_DATA_PREPARATION",
         "PREPROCESSING_ESTIMATION_SIGHT_DEPOSIT_RATES_SPARK",
         "PREPROCESSING_ESTIMATION_SIGHT_DEPOSIT_VOLUME_SPARK",
-        "PREPROCESSING_APPLICATION_PREPAYMENT_SPARK",
-        "SCENARIO_DATA_PREPARATION",
-        "SIGHT_DEPOSIT_STABLE_APPLICATION",
-        "BPER_PREPAYMENT_APPLICATION",
-        "SIGHT_DEPOSIT_DECAY_APPLICATION",
         "SIGHT_DEPOSIT_STABLE_ESTIMATION",
-        "BPER_PREPAYMENT_ESTIMATION",  # NOT WORKING !! -- # TO DO:
         "SIGHT_DEPOSIT_DECAY_ESTIMATION",
-        "BPER_RATES_MODEL_ESTIMATION"
+        "PREPROCESSING_APPLICATION_SIGHT_DEPOSIT_VOLUMES_SPARK",
+        "SIGHT_DEPOSIT_STABLE_APPLICATION",
+        "SIGHT_DEPOSIT_DECAY_APPLICATION",
+        "PREPROCESSING_ESTIMATION_PREPAYMENT_SPARK",
+        "BPER_PREPAYMENT_ESTIMATION",
+        "PREPROCESSING_APPLICATION_PREPAYMENT_SPARK",
+        "BPER_PREPAYMENT_APPLICATION"
+
     ]
 
     shorten_project_names = {
@@ -149,10 +162,10 @@ if __name__ == "__main__":
     ]
 
     dfs = {}
-    n_prj = 1
+    n_prj = 0
     for project in projects:
         n_prj += 1
-        print(f"project number: {n_prj}")
+        print(f"prj_n:: {n_prj}")
         print(f"processing project: {project.name}")
         all_res = project.get_resources()
         pip_dict = {i.uid[:-6]: i.pk for i in all_res if i._cls == 'DataFlow'}
@@ -181,6 +194,7 @@ if __name__ == "__main__":
                 "TYPE",
                 "CONNECTOR_NAME",
                 "FILE_NAME",
+                "TABLE_NAME",
                 "STORAGE_ACCOUNT_NAME",
                 "CONTAINER_NAME",
                 "FOLDER_NAME"
@@ -193,6 +207,7 @@ if __name__ == "__main__":
             for d in ds:
                 remote_connector = d["connector"].get("remote_connector")
                 filename = d["connector"].get("filename")
+                table_name = d["connector"].get("tablename")
 
                 if remote_connector:
                     connector_info = get_connector(client=client, pk=remote_connector)
@@ -208,6 +223,7 @@ if __name__ == "__main__":
                         "remote",
                         connector_name,
                         filename,
+                        table_name,
                         storage_account,
                         container_name,
                         path
@@ -219,6 +235,7 @@ if __name__ == "__main__":
                         pipe_name,
                         d["ID"],
                         "local",
+                        "",
                         "",
                         "",
                         "",
@@ -237,17 +254,18 @@ if __name__ == "__main__":
         print(f"REMOTE data sources -> {remote_ds_count}")
         print(f"LOCAL data sources -> {local_ds_count}")
         print(f"TOTAL data sources: {local_ds_count + remote_ds_count}")
-        print("\n")
-        print("____________________________________________________________________________")
-        print("\n")
+        print("__________________________________________________________________________________")
 
     with pd.ExcelWriter(output_name) as writer:
+        print("Writing .xlsx file..")
         for table_name, df in dfs.items():
             df.to_excel(writer, sheet_name=shorten_project_names[table_name], index=False)
             print(f"{shorten_project_names[table_name]}, Sheet added. ")
 
     green = '\033[92m'
     reset = '\033[0m'
+    print("__________________________________________________________________________________")
+    print("\n")
     print(
         green + f"Success. in (%s seconds). "
         % round((time.time() - start_time), 2), f"\nFile '{output_name}', written." + reset
