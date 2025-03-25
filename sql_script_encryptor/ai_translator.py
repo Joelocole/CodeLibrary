@@ -1,5 +1,6 @@
 import openai
 from SQLScriptEncryptor import *
+import os
 
 # instruction prompt
 fixed_prompt = """
@@ -35,7 +36,7 @@ if __name__ == "__main__":
 
     save_name_mappings_to_file(name_mappings, file_name)
 
-    api_key = "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"
+    api_key = os.getenv("API_KEY")
     # Generate response using GPT-3 API
     encrypted_response = generate_response(encrypted_sql_script, api_key=api_key)
 
